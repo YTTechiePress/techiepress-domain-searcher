@@ -12,3 +12,13 @@
 */
 
 defined( 'ABSPATH' ) or die( 'Unauthorize access!' );
+
+add_shortcode( 'techiepress_domains', 'add_input_form' );
+
+function add_input_form() {
+    $form = '<form>
+                <input type="text" value="" name="domain-searcher-input" class="domain-searcher-input" />
+                <input type="submit" value="Search" class="domain-searcher-submit" />
+            </form>';
+    return $form;
+}
