@@ -55,8 +55,8 @@ function check_availability() {
     $json = json_encode($xml);
     $php = json_decode($json);
 
-    echo '<pre>';
-    var_dump( $php);
-    echo '</pre>';
+    // echo '<pre>';
+    // var_dump( $php);
+    // echo '</pre>';
 
 }
