@@ -14,25 +14,53 @@
 defined( 'ABSPATH' ) or die( 'Unauthorize access!' );
 
 add_shortcode( 'techiepress_domains', 'add_input_form' );
+add_action( 'wp_ajax_query_xml_api', 'techiepress_query_xml_api' );
+add_action( 'wp_ajax_nopriv_query_xml_api', 'techiepress_query_xml_api' );
+
+function techiepress_query_xml_api() {
+
+    // [action] => query_xml_api
+    // [search_text] => techiepress.ug
+    error_log( print_r( $_POST, true ) );
+
+    if ( empty( $_POST ) || empty( $_POST['search_text'] ) ) {
+        echo json_encode( 'Required POST Items missing' );
+        wp_die();
+    }
+
+    if ( ! empty( $_POST ) || ! empty( $_POST['search_text'] ) ) {
+        $results = check_availability_xml_data( $_POST['search_text'] );
+        echo json_encode( $results );
+        wp_die();
+    }
+
+
+}
 
 function add_input_form() {
+    
+    wp_enqueue_script( 'techiepress-xml-form-check', plugin_dir_url( __FILE__ ) . '/assets/js/api-xml-searcher.js', array( 'jquery' ), '1.0.0', true );
+    wp_localize_script( 'techiepress-xml-form-check', 'ajax_values', array(
+        'ajax_url' => admin_url( 'admin-ajax.php' ),
+    ) ); 
+
     $form = '<form>
-                <input type="text" value="" name="domain-searcher-input" class="domain-searcher-input" />
-                <input type="submit" value="Search" class="domain-searcher-submit" />
+                <input type="text" value="" name="domain-searcher-input" id="domain-searcher-input" class="domain-searcher-input" />
+                <input type="submit" value="Search" id="domain-searcher-submit" class="domain-searcher-submit" />
+                <div id="registration" class="registration"></div>
             </form>';
 
-    check_availability();
+    // check_availability_xml_data();
 
     return $form;
 }
 
-function check_availability() {
+function check_availability_xml_data( $domain_value ) {
 
     $body = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>
     <request cmd="check">
         <domains>
-            <domain name="ura.go.ug"></domain>
-            <domain name="techiepress.ug"></domain>
+            <domain name="' . $domain_value . '"></domain>
         </domains>
     </request>';
 
@@ -45,18 +73,40 @@ function check_availability() {
         ),
     );
 
-    $results = wp_remote_post( $url, $args );
+    $results       = wp_remote_post( $url, $args );
+    $body_response = wp_remote_retrieve_body( $results );
 
-    $body_response = wp_remote_retrieve_body($results);
+    $domains       = convert_xml_to_php_array( $body_response );
 
-    // error_log( print_r( $body_response, true ) );
+    return $domains;
 
-    $xml = simplexml_load_string( $body_response );
+}
+
+function convert_xml_to_php_array( $body_response ) {
+    
+    $formatted_domains = [];
+
+    $xml  = simplexml_load_string( $body_response );
     $json = json_encode($xml);
-    $php = json_decode($json);
+    $php  = json_decode($json);
+    
+    if ( ! is_array( $php->domains ) ) {
+        $domain_log = $php->domains->domain->{'@attributes'};
+        array_push( $formatted_domains, [ 'name' => $domain_log->name, 'availability' => $domain_log->avail ] );
+    }
 
-    // echo '<pre>';
-    // var_dump( $php);
-    // echo '</pre>';
+    if ( is_array( $php->domains ) ) {
+        foreach ( $php->domains as $domain ) {
+            foreach ( $domain as $domain_info ) {
+                $domain_log = $domain_info->{'@attributes'};
+    
+                $name  = $domain_log->name;
+                $avail = $domain_log->avail;
+                array_push( $formatted_domains, [ 'name' => $name, 'availability' => $avail ] );
+            }
+        }
+    }
+    
+    return $formatted_domains;
 
 }
